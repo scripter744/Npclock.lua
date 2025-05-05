@@ -9,7 +9,9 @@ local hitboxSize = Vector3.new(10, 10, 10)
 local visuals = {}
 local hitboxParts = {}
 
-pcall(function() game:GetService("CoreGui").LeokaiCamlockButton:Destroy() end)
+pcall(function()
+    game:GetService("CoreGui").LeokaiCamlockButton:Destroy()
+end)
 
 local screenGui = Instance.new("ScreenGui")
 screenGui.Name = "LeokaiCamlockButton"
@@ -38,118 +40,129 @@ corner.Parent = camlockBtn
 local cachedTargets = {}
 
 local function createVisual(part)
-	if visuals[part] then return end
-	local adorn = Instance.new("BoxHandleAdornment")
-	adorn.Name = "__CamlockVisual"
-	adorn.Size = hitboxSize
-	adorn.Color3 = Color3.fromRGB(0, 170, 255)
-	adorn.Transparency = 1
-	adorn.AlwaysOnTop = true
-	adorn.ZIndex = 5
-	adorn.Adornee = part
-	adorn.Parent = part
-	visuals[part] = adorn
+    if visuals[part] then return end
+    local adorn = Instance.new("BoxHandleAdornment")
+    adorn.Name = "__CamlockVisual"
+    adorn.Size = hitboxSize
+    adorn.Color3 = Color3.fromRGB(0, 170, 255)
+    adorn.Transparency = 1
+    adorn.AlwaysOnTop = true
+    adorn.ZIndex = 5
+    adorn.Adornee = part
+    adorn.Parent = part
+    visuals[part] = adorn
 end
 
 local function expandHitbox(model, part)
-	if hitboxParts[part] then return end
-
-	local fakeHitbox = Instance.new("Part")
-	fakeHitbox.Size = hitboxSize
-	fakeHitbox.Transparency = 1
-	fakeHitbox.Anchored = true
-	fakeHitbox.CanCollide = false
-	fakeHitbox.Name = "__ExpandedHitbox"
-	fakeHitbox.Parent = model
-
-	hitboxParts[part] = fakeHitbox
+    if hitboxParts[part] then return end
+    local fakeHitbox = Instance.new("Part")
+    fakeHitbox.Size = hitboxSize
+    fakeHitbox.Transparency = 1
+    fakeHitbox.Anchored = true
+    fakeHitbox.CanCollide = false
+    fakeHitbox.Name = "__ExpandedHitbox"
+    fakeHitbox.Parent = model
+    hitboxParts[part] = fakeHitbox
 end
 
 local function refreshTargets()
-	cachedTargets = {}
-	for _, model in pairs(workspace:GetDescendants()) do
-		if model:IsA("Model") and model ~= LocalPlayer.Character and not Players:GetPlayerFromCharacter(model) then
-			local humanoid = model:FindFirstChildOfClass("Humanoid")
-			local part = model:FindFirstChild(targetPartName)
-			if humanoid and part then
-				table.insert(cachedTargets, model)
-				expandHitbox(model, part)
-				if not humanoid:FindFirstChild("__CamlockDeathConnection") then
-					local tag = Instance.new("BoolValue")
-					tag.Name = "__CamlockDeathConnection"
-					tag.Parent = humanoid
-					humanoid.Died:Connect(function()
-						task.wait(0.2)
-						refreshTargets()
-					end)
-				end
-			end
-		end
-	end
+    cachedTargets = {}
+    for _, model in pairs(workspace:GetDescendants()) do
+        if model:IsA("Model") and model ~= LocalPlayer.Character and not Players:GetPlayerFromCharacter(model) then
+            local humanoid = model:FindFirstChildOfClass("Humanoid")
+            local part = model:FindFirstChild(targetPartName)
+            if humanoid and part then
+                table.insert(cachedTargets, model)
+                expandHitbox(model, part)
+                if not humanoid:FindFirstChild("__CamlockDeathConnection") then
+                    local tag = Instance.new("BoolValue")
+                    tag.Name = "__CamlockDeathConnection"
+                    tag.Parent = humanoid
+                    humanoid.Died:Connect(function()
+                        task.wait(0.2)
+                        refreshTargets()
+                    end)
+                end
+            end
+        end
+    end
 end
 
 local function isVisible(part)
-	local origin = Camera.CFrame.Position
-	local direction = (part.Position - origin).Unit * 500
-	local rayParams = RaycastParams.new()
-	rayParams.FilterDescendantsInstances = {LocalPlayer.Character}
-	rayParams.FilterType = Enum.RaycastFilterType.Blacklist
-	local result = workspace:Raycast(origin, direction, rayParams)
-	return result and result.Instance and part:IsDescendantOf(result.Instance.Parent)
+    local origin = Camera.CFrame.Position
+    local direction = (part.Position - origin).Unit * 500
+    local rayParams = RaycastParams.new()
+    rayParams.FilterDescendantsInstances = {LocalPlayer.Character}
+    rayParams.FilterType = Enum.RaycastFilterType.Blacklist
+    local result = workspace:Raycast(origin, direction, rayParams)
+    return result and result.Instance and part:IsDescendantOf(result.Instance.Parent)
 end
 
 local function getClosestVisibleTarget()
-	local closest, minDist = nil, math.huge
-	local camPos = Camera.CFrame.Position
-	for _, model in pairs(cachedTargets) do
-		local part = model:FindFirstChild(targetPartName)
-		if part and isVisible(part) then
-			local fakeHitbox = hitboxParts[part]
-			if fakeHitbox then
-				local dist = (camPos - fakeHitbox.Position).Magnitude
-				if dist < minDist then
-					minDist = dist
-					closest = fakeHitbox
-				end
-			end
-		end
-	end
-	return closest
+    local closest, minDist = nil, math.huge
+    local camPos = Camera.CFrame.Position
+    for _, model in pairs(cachedTargets) do
+        local part = model:FindFirstChild(targetPartName)
+        if part and isVisible(part) then
+            local fakeHitbox = hitboxParts[part]
+            if fakeHitbox then
+                local dist = (camPos - fakeHitbox.Position).Magnitude
+                if dist < minDist then
+                    minDist = dist
+                    closest = fakeHitbox
+                end
+            end
+        end
+    end
+    return closest
 end
 
--- Camlock behavior loop
+local smoothness = 0.058
+
 task.spawn(function()
-	while true do
-		if camlockEnabled then
-			local target = getClosestVisibleTarget()
-			if target then
-				createVisual(target)
-				Camera.CFrame = CFrame.new(Camera.CFrame.Position, target.Position)
-			end
-		end
-		task.wait(0.03)
-	end
+    while true do
+        if camlockEnabled then
+            local target = getClosestVisibleTarget()
+            if target then
+                createVisual(target)
+                local currentCFrame = Camera.CFrame
+                local targetCFrame = CFrame.new(Camera.CFrame.Position, target.Position)
+                Camera.CFrame = currentCFrame:Lerp(targetCFrame, smoothness)
+            end
+        end
+        task.wait(0.03)
+    end
 end)
 
--- Update target list loop
 task.spawn(function()
-	while true do
-		refreshTargets()
-		task.wait(2)
-	end
+    while true do
+        refreshTargets()
+        task.wait(2)
+    end
 end)
 
--- Hitbox updater (fixes floating bug)
 RunService.RenderStepped:Connect(function()
-	for realPart, fakeHitbox in pairs(hitboxParts) do
-		if realPart and realPart.Parent and fakeHitbox then
-			fakeHitbox.CFrame = realPart.CFrame
-		end
-	end
+    for realPart, fakeHitbox in pairs(hitboxParts) do
+        if realPart and realPart.Parent and fakeHitbox then
+            fakeHitbox.CFrame = realPart.CFrame
+        end
+    end
 end)
 
--- Camlock toggle
 camlockBtn.MouseButton1Click:Connect(function()
-	camlockEnabled = not camlockEnabled
-	camlockBtn.Text = camlockEnabled and "Camlock: ON" or "Camlock: OFF"
+    camlockEnabled = not camlockEnabled
+    camlockBtn.Text = camlockEnabled and "Camlock: ON" or "Camlock: OFF"
 end)
+
+local notification = Instance.new("TextLabel")
+notification.Size = UDim2.new(0, 300, 0, 60)
+notification.Position = UDim2.new(1, -310, 1, -70)
+notification.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+notification.BackgroundTransparency = 0.5
+notification.TextColor3 = Color3.fromRGB(255, 255, 255)
+notification.Text = "Follow locking_statsus_true on\nTiktok credits to him!"
+notification.TextSize = 16
+notification.Font = Enum.Font.SourceSans
+notification.TextWrapped = true
+notification.TextYAlignment = Enum.TextYAlignment.Top
+notification.Parent = screenGui
